@@ -17,6 +17,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static com.hw.flink.lineage.LineageInfo.DELIMITER;
+
+
 /**
  * Modified based on calcite's source code org.apache.calcite.rel.metadata.RelMdColumnOrigins
  *
@@ -29,20 +32,16 @@ import java.util.stream.Collectors;
  *  <li>Support CEP, add method getColumnOrigins(Match rel, RelMetadataQuery mq, int iOutputColumn)
  *  <li>Support ROW_NUMBER(), add method getColumnOrigins(Window rel, RelMetadataQuery mq, int iOutputColumn)
  *  <li>Support transform, add method createDerivedColumnOrigins(Set<RelColumnOrigin> inputSet, String transform, boolean originTransform), and related code
+ *  <li>Support PROCTIME() is the first filed, add method computeIndexWithOffset, used by getColumnOrigins(Calc rel, RelMetadataQuery mq, int iOutputColumn)
  * <ol/>
  *
- * @description: RelMdColumnOrigins supplies a default implementation of {@link
- * RelMetadataQuery#getColumnOrigins} for the standard logical algebra.
+ * @description: RelMdColumnOrigins supplies a default implementation of {@link RelMetadataQuery#getColumnOrigins} for the standard logical algebra.
  * @author: HamaWhite
  * @version: 1.0.0
- * @date: 2022/11/24 7:47 PM
  */
 public class RelMdColumnOrigins implements MetadataHandler<BuiltInMetadata.ColumnOrigin> {
 
     private static final Logger LOG = LoggerFactory.getLogger(RelMdColumnOrigins.class);
-
-    private static final String DELIMITER = ".";
-
 
     public static final RelMetadataProvider SOURCE =
             ReflectiveRelMetadataProvider.reflectiveSource(
@@ -124,7 +123,7 @@ public class RelMdColumnOrigins implements MetadataHandler<BuiltInMetadata.Colum
             TableFunctionScan tableFunctionScan = (TableFunctionScan) rel.getRight();
             RexCall rexCall = (RexCall) tableFunctionScan.getCall();
             // support only one field in table function
-            RexFieldAccess rexFieldAccess = (RexFieldAccess) rexCall.operands.get(0);
+            RexFieldAccess rexFieldAccess = (RexFieldAccess) rexCall.getOperands().get(0);
             String fieldName = rexFieldAccess.getField().getName();
 
             int leftFieldIndex = 0;
@@ -279,8 +278,12 @@ public class RelMdColumnOrigins implements MetadataHandler<BuiltInMetadata.Colum
         if (rexNode instanceof RexInputRef) {
             // Direct reference:  no derivation added.
             RexInputRef inputRef = (RexInputRef) rexNode;
-            return mq.getColumnOrigins(input, inputRef.getIndex());
-        } else if (rexNode instanceof RexCall && ((RexCall) rexNode).operands.isEmpty()) {
+            int index = inputRef.getIndex();
+            if (input instanceof TableScan) {
+                index = computeIndexWithOffset(projects, inputRef.getIndex(), iOutputColumn);
+            }
+            return mq.getColumnOrigins(input, index);
+        } else if (rexNode instanceof RexCall && ((RexCall) rexNode).getOperands().isEmpty()) {
             // support for new fields in the source table similar to those created with the LOCALTIMESTAMP function
             return getColumnOrigins(rel, iOutputColumn);
         }
@@ -290,6 +293,16 @@ public class RelMdColumnOrigins implements MetadataHandler<BuiltInMetadata.Colum
         return createDerivedColumnOrigins(set, rexNode.toString(), true);
     }
 
+    private int computeIndexWithOffset(List<RexNode> projects, int baseIndex, int iOutputColumn) {
+        int offset = 0;
+        for (int index = 0; index < iOutputColumn; index++) {
+            RexNode rexNode = projects.get(index);
+            if ((rexNode instanceof RexCall && ((RexCall) rexNode).getOperands().isEmpty())) {
+                offset += 1;
+            }
+        }
+        return baseIndex + offset;
+    }
 
     /**
      * Support for new fields in the source table similar to those created with the LOCALTIMESTAMP function
@@ -298,7 +311,8 @@ public class RelMdColumnOrigins implements MetadataHandler<BuiltInMetadata.Colum
         TableSourceTable table = ((TableSourceTable) rel.getInput().getTable());
         if (table != null) {
             String targetFieldName = rel.getProgram().getOutputRowType().getFieldList().get(iOutputColumn).getName();
-            List<String> fieldList = table.catalogTable().getResolvedSchema().getColumnNames();
+            List<String> fieldList = table.contextResolvedTable().getResolvedSchema().getColumnNames();
+
             int index = -1;
             for (int i = 0; i < fieldList.size(); i++) {
                 if (fieldList.get(i).equalsIgnoreCase(targetFieldName)) {

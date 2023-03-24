@@ -10,14 +10,21 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.table.api.*;
+import org.apache.flink.table.api.EnvironmentSettings;
+import org.apache.flink.table.api.TableConfig;
+import org.apache.flink.table.api.TableException;
+import org.apache.flink.table.api.TableResult;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogManager;
 import org.apache.flink.table.catalog.FunctionCatalog;
-import org.apache.flink.table.operations.CatalogSinkModifyOperation;
+import org.apache.flink.table.module.ModuleManager;
 import org.apache.flink.table.operations.Operation;
+import org.apache.flink.table.operations.SinkModifyOperation;
+import org.apache.flink.table.operations.ddl.CreateTableASOperation;
+import org.apache.flink.table.operations.ddl.CreateTableOperation;
 import org.apache.flink.table.planner.calcite.FlinkRelBuilder;
 import org.apache.flink.table.planner.calcite.SqlExprToRexConverterFactory;
 import org.apache.flink.table.planner.delegation.PlannerBase;
@@ -102,25 +109,64 @@ public class LineageContext {
                     "Unsupported SQL query! only accepts a single SQL statement.");
         }
         Operation operation = operations.get(0);
-        if (operation instanceof CatalogSinkModifyOperation) {
-            CatalogSinkModifyOperation sinkOperation = (CatalogSinkModifyOperation) operation;
+        // process create table as select
+        operation = prePocessCprereateTableASOperation(operation);
+
+        if (operation instanceof SinkModifyOperation) {
+            SinkModifyOperation sinkOperation = (SinkModifyOperation) operation;
 
             PlannerQueryOperation queryOperation = (PlannerQueryOperation) sinkOperation.getChild();
             RelNode relNode = queryOperation.getCalciteTree();
             return new Tuple2<>(
-                    sinkOperation.getTableIdentifier().asSummaryString(),
+                    sinkOperation.getContextResolvedTable().getIdentifier().asSummaryString(),
                     relNode);
         } else {
             throw new TableException("Only insert is supported now.");
         }
     }
 
+    /**
+     * There are two parts in CTAS, the SELECT part can be any SELECT query supported by Flink SQL.
+     * The CREATE part takes the resulting schema from the SELECT part and creates the target table.
+     *
+     * This method creates a new table and returns the remaining insert for subsequent lineage.
+     */
+    private Operation prePocessCprereateTableASOperation(Operation operation) {
+        if (operation instanceof CreateTableASOperation) {
+            CreateTableASOperation ctasOperation = (CreateTableASOperation) operation;
+            CreateTableOperation createTableOperation = ctasOperation.getCreateTableOperation();
+
+            if (createTableOperation.isTemporary()) {
+                tableEnv.getCatalogManager().createTemporaryTable(
+                        createTableOperation.getCatalogTable(),
+                        createTableOperation.getTableIdentifier(),
+                        createTableOperation.isIgnoreIfExists());
+            } else {
+                tableEnv.getCatalogManager().createTable(
+                        createTableOperation.getCatalogTable(),
+                        createTableOperation.getTableIdentifier(),
+                        createTableOperation.isIgnoreIfExists());
+            }
+            return ctasOperation.toSinkModifyOperation(tableEnv.getCatalogManager());
+        }
+        return operation;
+    }
 
     /**
      * Calling each program's optimize method in sequence.
      */
     private RelNode optimize(RelNode relNode) {
         return flinkChainedProgram.optimize(relNode, new StreamOptimizeContext() {
+            @Override
+            public ClassLoader getClassLoader() {
+                return getPlanner().getFlinkContext().getClassLoader();
+            }
+
+            @Override
+            public ModuleManager getModuleManager() {
+                return getPlanner().moduleManager();
+            }
+
             @Override
             public boolean isBatchMode() {
                 return false;
@@ -209,7 +255,7 @@ public class LineageContext {
 
                     // filed
                     int ordinal = rco.getOriginColumnOrdinal();
-                    List<String> fieldNames = ((TableSourceTable) table).catalogTable().getResolvedSchema().getColumnNames();
+                    List<String> fieldNames = ((TableSourceTable) table).contextResolvedTable().getResolvedSchema().getColumnNames();
                     String sourceColumn = fieldNames.get(ordinal);
                     LOG.debug("----------------------------------------------------------");
                     LOG.debug("Source table: {}", sourceTable);

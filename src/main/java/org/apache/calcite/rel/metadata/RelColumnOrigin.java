@@ -17,21 +17,6 @@
 package org.apache.calcite.rel.metadata;
 
 import org.apache.calcite.plan.RelOptTable;
-
-/**
- * Modified based on calcite's source code org.apache.calcite.rel.metadata.RelColumnOrigin
- * <p>
- * Modification point:
- * <ol>
- *  <li>add transform field and related code.
- * </ol>
- *
- * @description: RelColumnOrigin is a data structure describing one of the origins of an
- * output column produced by a relational expression.
- * @author: HamaWhite
- * @version: 1.0.0
- * @date: 2023/01/03 7:47 PM
- */
 public class RelColumnOrigin {
     //~ Instance fields --------------------------------------------------------
 
