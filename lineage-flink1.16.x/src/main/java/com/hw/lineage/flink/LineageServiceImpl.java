@@ -45,7 +45,6 @@ import org.apache.flink.table.delegation.Parser;
 import org.apache.flink.table.functions.*;
 import org.apache.flink.table.operations.Operation;
 import org.apache.flink.table.operations.SinkModifyOperation;
-import org.apache.flink.table.operations.ddl.CreateTableOperation;
 import org.apache.flink.table.planner.delegation.ParserImpl;
 import org.apache.flink.table.planner.delegation.PlannerBase;
 import org.apache.flink.table.planner.operations.PlannerQueryOperation;
@@ -187,7 +186,7 @@ public class LineageServiceImpl implements LineageService {
         Operation operation = parseValidateConvert(singleSql);
 
         // process create table as select
-//        operation = prePocessCreateTableAsOperation(operation);
+        // operation = prePocessCreateTableAsOperation(operation);
 
         if (operation instanceof SinkModifyOperation) {
             SinkModifyOperation sinkOperation = (SinkModifyOperation) operation;
@@ -221,8 +220,6 @@ public class LineageServiceImpl implements LineageService {
         }
         return operations.get(0);
     }
-
-
 
     private List<LineageResult> buildFiledLineageResult(String sinkTable, RelNode optRelNode) {
         // target columns
