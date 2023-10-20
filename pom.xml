@@ -10,13 +10,7 @@
 
     <modules>
         <module>lineage-common</module>
-        <module>lineage-loader</module>
-        <module>lineage-flink1.14.x</module>
         <module>lineage-flink1.16.x</module>
-        <module>lineage-client</module>
-        <module>lineage-web</module>
-        <module>lineage-server</module>
-        <module>lineage-dist</module>
     </modules>
 
     <properties>
@@ -31,7 +25,7 @@
         <slf4j-api.version>1.7.32</slf4j-api.version>
         <commons-io.version>2.7</commons-io.version>
         <commons-lang3.version>3.12.0</commons-lang3.version>
-        <manifold-ext.version>2023.1.11</manifold-ext.version>
+        <manifold-ext.version>2023.1.29</manifold-ext.version>
         <avatar-generator.version>1.1.0</avatar-generator.version>
         <commons-collections4.version>4.4</commons-collections4.version>
 
@@ -49,9 +43,9 @@
         <knife4j-spring-boot-starter.version>3.0.3</knife4j-spring-boot-starter.version>
         <pagehelper.version>5.3.2</pagehelper.version>
         <springfox-boot-starter.version>3.0.0</springfox-boot-starter.version>
-        <maven-jar-plugin.version>2.6</maven-jar-plugin.version>
+        <maven-jar-plugin.version>3.2.0</maven-jar-plugin.version>
         <maven-clean-plugin.verion>3.1.0</maven-clean-plugin.verion>
-        <scala-maven-plugin.version>3.3.1</scala-maven-plugin.version>
+        <scala-maven-plugin.version>4.8.0</scala-maven-plugin.version>
         <maven-source-plugin.version>3.2.1</maven-source-plugin.version>
         <maven-antrun-plugin.version>3.1.0</maven-antrun-plugin.version>
         <maven-assembly-plugin.version>3.1.0</maven-assembly-plugin.version>
@@ -63,7 +57,7 @@
         <maven-dependency-plugin.version>3.2.0</maven-dependency-plugin.version>
         <mybatis-generator-maven-plugin.version>1.4.1</mybatis-generator-maven-plugin.version>
 
-        <target.java.version>1.8</target.java.version>
+        <target.java.version>11</target.java.version>
         <maven.compiler.source>${target.java.version}</maven.compiler.source>
         <maven.compiler.target>${target.java.version}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -311,32 +305,51 @@
                     <artifactId>maven-assembly-plugin</artifactId>
                     <version>${maven-assembly-plugin.version}</version>
                 </plugin>
-
                 <plugin>
-                    <groupId>net.alchim31.maven</groupId>
-                    <artifactId>scala-maven-plugin</artifactId>
-                    <version>${scala-maven-plugin.version}</version>
-                    <configuration>
-                        <scalaVersion>${scala.binary.version}</scalaVersion>
-                    </configuration>
+                    <!--将scala文件编译到class文件中， maven中进行开发-->
+                    <groupId>org.scala-tools</groupId>
+                    <artifactId>maven-scala-plugin</artifactId>
+                    <version>2.15.2</version>
                     <executions>
                         <execution>
                             <id>scala-compile-first</id>
                             <goals>
-                                <goal>add-source</goal>
                                 <goal>compile</goal>
                             </goals>
-                            <phase>process-resources</phase>
-                        </execution>
-                        <execution>
-                            <goals>
-                                <goal>compile</goal>
-                                <goal>testCompile</goal>
-                            </goals>
-                            <phase>compile</phase>
+                            <configuration>
+                                <includes>
+                                    <include>**/*.scala</include>
+                                </includes>
+                            </configuration>
                         </execution>
                     </executions>
                 </plugin>
+
+                <!--                <plugin>-->
+                <!--                    <groupId>net.alchim31.maven</groupId>-->
+                <!--                    <artifactId>scala-maven-plugin</artifactId>-->
+                <!--                    <version>${scala-maven-plugin.version}</version>-->
+                <!--                    <configuration>-->
+                <!--                        <scalaVersion>${scala.binary.version}</scalaVersion>-->
+                <!--                    </configuration>-->
+                <!--                    <executions>-->
+                <!--                        <execution>-->
+                <!--                            <id>scala-compile-first</id>-->
+                <!--                            <goals>-->
+                <!--                                <goal>add-source</goal>-->
+                <!--                                <goal>compile</goal>-->
+                <!--                            </goals>-->
+                <!--                            <phase>process-resources</phase>-->
+                <!--                        </execution>-->
+                <!--                        <execution>-->
+                <!--                            <goals>-->
+                <!--                                <goal>compile</goal>-->
+                <!--                                <goal>testCompile</goal>-->
+                <!--                            </goals>-->
+                <!--                            <phase>compile</phase>-->
+                <!--                        </execution>-->
+                <!--                    </executions>-->
+                <!--                </plugin>-->
 
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>

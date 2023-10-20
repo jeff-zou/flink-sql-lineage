@@ -43,7 +43,6 @@ import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.catalog.*;
 import org.apache.flink.table.delegation.Parser;
 import org.apache.flink.table.functions.*;
-import org.apache.flink.table.operations.CreateTableASOperation;
 import org.apache.flink.table.operations.Operation;
 import org.apache.flink.table.operations.SinkModifyOperation;
 import org.apache.flink.table.operations.ddl.CreateTableOperation;
@@ -188,7 +187,7 @@ public class LineageServiceImpl implements LineageService {
         Operation operation = parseValidateConvert(singleSql);
 
         // process create table as select
-        operation = prePocessCreateTableAsOperation(operation);
+//        operation = prePocessCreateTableAsOperation(operation);
 
         if (operation instanceof SinkModifyOperation) {
             SinkModifyOperation sinkOperation = (SinkModifyOperation) operation;
@@ -223,32 +222,7 @@ public class LineageServiceImpl implements LineageService {
         return operations.get(0);
     }
 
-    /**
-     * There are two parts in CTAS, the SELECT part can be any SELECT query supported by Flink SQL.
-     * The CREATE part takes the resulting schema from the SELECT part and creates the target table.
-     * <p>
-     * This method creates a new table and returns the remaining insert for subsequent lineage.
-     */
-    private Operation prePocessCreateTableAsOperation(Operation operation) {
-        if (operation instanceof CreateTableASOperation) {
-            CreateTableASOperation ctasOperation = (CreateTableASOperation) operation;
-            CreateTableOperation createTableOperation = ctasOperation.getCreateTableOperation();
 
-            if (createTableOperation.isTemporary()) {
-                tableEnv.getCatalogManager().createTemporaryTable(
-                        createTableOperation.getCatalogTable(),
-                        createTableOperation.getTableIdentifier(),
-                        createTableOperation.isIgnoreIfExists());
-            } else {
-                tableEnv.getCatalogManager().createTable(
-                        createTableOperation.getCatalogTable(),
-                        createTableOperation.getTableIdentifier(),
-                        createTableOperation.isIgnoreIfExists());
-            }
-            return ctasOperation.toSinkModifyOperation(tableEnv.getCatalogManager());
-        }
-        return operation;
-    }
 
     private List<LineageResult> buildFiledLineageResult(String sinkTable, RelNode optRelNode) {
         // target columns
